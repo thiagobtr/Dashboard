@@ -29,7 +29,7 @@ html.Div([
         dcc.Dropdown(
         id='dropdown-rodadas'
         ,options = [{'label':time ,'value':time}for time in Times]
-        ,value = 'Everton')])
+        ,value = 'Everton FC')])
         ],className= 'row')
 
     ,html.Div([
