@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 
 
 
-def Carrega_table(url,rodada,banco):
+def Carrega_table(url,liga,rodada,temporada):
     # Definimos a url
     # Verifique as permissões em https://www.python.org/robots.txt
     with urllib.request.urlopen(url) as url:
@@ -44,38 +44,44 @@ def Carrega_table(url,rodada,banco):
         dados_ok.append(d)
 
 
-    Tabela_PremierLeague = pd.DataFrame.from_records(dados_ok,columns = head)
+    tabela_liga = pd.DataFrame.from_records(dados_ok,columns = head)
 
-    Tabela_PremierLeague.rename(columns={'#':'rank','M.':'M','Dif.':'Dif','Pt.':'Pt'},inplace=True)
+    tabela_liga.rename(columns={'#':'rank','M.':'M','Dif.':'Dif','Pt.':'Pt'},inplace=True)
 
-    #Cria coluna rodada
-    Tabela_PremierLeague['Rodada'] = rodada
+    #Cria coluna 'Rodada'
+    tabela_liga['Rodada'] = rodada
+
+    #Cria coluna 'Temporada'
+    tabela_liga['Temporada'] = temporada
+
+    #Cria coluna 'Temporada'
+    tabela_liga['Liga'] = liga
 
     #Cria DataFrame
-    PremierLeagueDict = Tabela_PremierLeague.to_dict('records')
+    tabela_liga_dict = tabela_liga.to_dict('records')
 
     #Conectando ao Mongodb
     conn = MongoClient('localhost',27017)
 
-    #Criacao do Banco
-    db = conn.PremierLeague
-    db = conn[banco]
+    #Criacao do Banco 'Ligas_futebol'
+    db = conn.Ligas_futebol
+    #db = conn[banco]
 
-    #Criacao da colecao
-    Premier_rank = db.Rank
+    #Criacao/Conexao da colecao
+    liga_rank = db.Rank
 
     #Verfica se os items ja existem
-    if Premier_rank.find_one({'Rodada':rodada}):
+    if liga_rank.find_one({'$and':[{'Rodada':rodada},{'Temporada':temporada},{'Liga':liga}]}):
         #remove todos os documentos
-        Premier_rank.delete_many({'Rodada':rodada})
+        liga_rank.delete_many({'$and':[{'Rodada':rodada},{'Temporada':temporada},{'Liga':liga}]})
 
     #inserindo dados na colecao
-    resultado = Premier_rank.insert_many(PremierLeagueDict)
+    resultado = liga_rank.insert_many(tabela_liga_dict)
 
-    print (resultado)
+    return (resultado)
 
 
-def Carrega_placar(url,rodada,banco):
+def Carrega_placar(url,liga,rodada,temporada):
     with urllib.request.urlopen(url) as url:
         page = url.read()
 
@@ -92,12 +98,6 @@ def Carrega_placar(url,rodada,banco):
     for jogo in Tabela_jogos_linha:
         jogos.append([partida.get_text(strip=True) for partida in jogo.find_all('td')])
 
-    Partidas = pd.DataFrame.from_records(jogos,columns = header)
-    Partidas.drop(['campo1','campo2','campo3'] ,axis = 1,inplace = True)
-
-    #Formata o placar
-    placar = [placar[0] for placar in Partidas['Placar'].str.split('(').tolist()]
-    Partidas['Placar'] = placar
 
     #Cria DataFrame
     Partidas = pd.DataFrame.from_records(jogos,columns = header)
@@ -106,14 +106,21 @@ def Carrega_placar(url,rodada,banco):
     #Formata o variavel 'placar' e cria variavel 'Rodada'
     placar = [placar[0] for placar in Partidas['Placar'].str.split('(').tolist()]
     Partidas['Placar'] = placar
+
+    #Cria variavel 'Rodada'
     Partidas['Rodada'] = rodada
+
+    #Cria variavel 'Temporada'
+    Partidas['Temporada'] = temporada
+
+    #Cria variavel 'Liga'
+    Partidas['Liga'] = liga
 
     #Conectando ao Mongodb
     conn = MongoClient('localhost',27017)
 
-    #Criacao do Banco
-    #db = conn.PremierLeague
-    db = conn[banco]
+    #Criacao/Conexao do Banco
+    db = conn.Ligas_futebol
 
     #Criacao da colecao
     Placar_collection = db.Rodadas
@@ -121,14 +128,14 @@ def Carrega_placar(url,rodada,banco):
 
 
     #Verfica se os items ja existem
-    if Placar_collection.find_one({'Rodada':rodada}):
+    if Placar_collection.find_one({'$and':[{'Rodada':rodada},{'Temporada':temporada},{'Liga':liga}]}):
         #remove todos os documentos
-        Placar_collection.delete_many({'Rodada':rodada})
+        Placar_collection.delete_many({'$and':[{'Rodada':rodada},{'Temporada':temporada},{'Liga':liga}]})
 
     #inserindo dados na colecao
     Dados_placar = Placar_collection.insert_many(Placar_dict)
 
-def Carrega_art_ass (url,rodada,banco):
+def Carrega_art_ass (url,liga,temporada):
 
     with urllib.request.urlopen(url) as url:
         page = url.read()
@@ -163,17 +170,23 @@ def Carrega_art_ass (url,rodada,banco):
     df_scorer['gols'] = gols
     df_scorer['ass'] = ass
 
+
     df_scorer['ass'] = df_scorer['ass'].str.split(')',expand=True)[0]
+
     df_scorer['gols'] = df_scorer['gols'].str.split('(',expand=True)[1]
 
-    df_scorer['Rodada'] = rodada
+    #df_scorer['Rodada'] = rodada
+
+    df_scorer['Liga'] = liga
+
+    df_scorer['Temporada'] = temporada
 
     #Conectando ao Mongodb
     conn = MongoClient('localhost',27017)
 
-    #Criacao do Banco
-    #db = conn.PremierLeague
-    db = conn[banco]
+    #Criacao/Conexao do Banco
+    db = conn.Ligas_futebol
+    #db = conn[banco]
 
     #Criacao da colecao
     Score_collection = db.score
@@ -181,10 +194,61 @@ def Carrega_art_ass (url,rodada,banco):
     Scorer_dict = df_scorer.to_dict('records')
 
     #Verfica se os items ja existem
-    if Score_collection.find_one({'Rodada':rodada}):
+    if Score_collection.find_one({'$and':[{'Liga':liga},{'Temporada':temporada}]}):
         #remove todos os documentos
-        Score_collection.delete_many({'Rodada':rodada})
+        Score_collection.delete_many({'$and':[{'Liga':liga},{'Temporada':temporada}]})
 
     #inserindo dados na colecao
     resultado = Score_collection.insert_many(Scorer_dict)
+    print(resultado)
+
+def Carrega_publico(url,liga,temporada):
+    with urllib.request.urlopen(url) as url:
+        page = url.read()
+
+    # Analise o html na variável 'page' e armazene-o no formato Beautiful Soup
+    soup = BeautifulSoup(page, "html.parser")
+    tabela_publico = soup.find_all('table',{'class':"standard_tabelle"})[0]
+    #Cabecalho
+    cabecalho = ['Rank','campo_vazio','Time','Total','Jogos','Media']
+
+    #Extrai os dados da tabela
+    Tabela_publico_dados = tabela_publico.find_all('tr')[1:]
+
+
+    #Extrai os dados para criacao do dataframe
+    dados=[]
+    for linha in Tabela_publico_dados:
+        dados.append([campo.get_text(strip=True) for campo in linha.find_all('td')])
+
+    df_publico = pd.DataFrame.from_records(dados,columns = cabecalho)
+
+    #Exclui campo desnecessarios
+    df_publico.drop('campo_vazio',axis=1,inplace=True)
+
+    #df_scorer['Rodada'] = rodada
+
+    df_publico['Liga'] = liga
+
+    df_publico['Temporada'] = temporada
+
+    #Conectando ao Mongodb
+    conn = MongoClient('localhost',27017)
+
+    #Criacao/Conexao do Banco
+    db = conn.Ligas_futebol
+    #db = conn[banco]
+
+    #Criacao da colecao
+    Colecao_publico = db.Publico
+
+    Publico_dict = df_publico.to_dict('records')
+
+    #Verfica se os items ja existem
+    if Colecao_publico.find_one({'$and':[{'Liga':liga},{'Temporada':temporada}]}):
+        #remove todos os documentos
+        Colecao_publico.delete_many({'$and':[{'Liga':liga},{'Temporada':temporada}]})
+
+    #inserindo dados na colecao
+    resultado = Colecao_publico.insert_many(Publico_dict)
     print(resultado)
