@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 
 def Carrega_table(url,liga,rodada,temporada):
     # Definimos a url
-    # Verifique as permissões em https://www.python.org/robots.txt
+    # Verifique as permissões em https://worldfootball.net/robots.txt
     with urllib.request.urlopen(url) as url:
         page = url.read()
 
