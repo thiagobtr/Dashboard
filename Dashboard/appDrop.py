@@ -61,7 +61,10 @@ app.layout = html.Div(children=[
                   )],className= 'eight columns')
 
         ,html.Div([
-                update_table_publico(2015,'Premier_league')
+                dcc.Graph(
+                 id='Tabela-publico'
+                  )
+                #update_table_publico(2015,'Premier_league')
 
             ],className='three columns')
 
